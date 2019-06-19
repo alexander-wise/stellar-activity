@@ -1,7 +1,7 @@
 # stellar-activity
 Tools for analyzing stellar activity in RV spectra
 
-Warning: This is a work in progress so I would not recommend anybody using this repository without contacting me first. I will remove this message when I moving my code to this repository.
+Warning: This is a work in progress so I would not recommend anybody using this repository without contacting me first. I will remove this message when I finish moving my code to this repository.
 
 The purpose of this repository is to make public all of the code that Alexander Wise has used to generate published papers:
 
