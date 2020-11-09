@@ -1,0 +1,174 @@
+from numpy import *
+import time
+import os
+import sys
+from scipy.stats.stats import linregress
+from astropy.io import fits
+from datetime import datetime
+from jdcal import gcal2jd
+
+print 'Initializing...'
+
+def getFolderSize(folder):
+    total_size = os.path.getsize(folder)
+    for item in os.listdir(folder):
+        itempath = os.path.join(folder, item)
+        if os.path.isfile(itempath):
+            total_size += os.path.getsize(itempath)
+        elif os.path.isdir(itempath):
+            total_size += getFolderSize(itempath)
+    return total_size
+
+nprocsmax=800
+
+#datadir = "/Volumes/My_Passport/HARPS/AlphaCen/"
+datadir = "/lustre/work/phys/aww/spectra/AlphaCen/"
+#datadir = "/lustre/work/phys/aww/spectra/HARPS/"
+targets = ['B']
+#targets = ['EpsEri']
+os.system("rm " + datadir + ".DS_Store")
+
+folders = []
+for i in targets:
+	folders.append(datadir + i + '/')
+
+n = len(folders)
+
+#sort folders by size
+foldersizes = zeros(n)
+for i in range(n):
+	foldersizes[i] = getFolderSize(folders[i])
+folders = list(array(folders)[argsort(foldersizes)])
+foldersizes = sort(foldersizes)
+
+
+#file name change key: norm -> normInterp // wave0 -> wave // norm0 -> norm // normRV -> normRVInterp // onlyRV -> RVInterp OR blazeRVInterp
+print('Deleting old files...')
+for folder in range(n): #delete old files
+	filelist = array(os.listdir(folders[folder]))
+	fitslist = filelist[where(array([('20' in filelist[i][:2]) for i in range(len(filelist))]))[0]]
+	for fi in fitslist:
+		checkDir = folders[folder] + fi + "/wave.npy"
+		os.system('rm ' + checkDir)
+		checkDir = folders[folder] + fi + "/norm.npy"
+		os.system('rm ' + checkDir)
+		checkDir = folders[folder] + fi + "/normInterp.npy"
+		os.system('rm ' + checkDir)
+		checkDir = folders[folder] + fi + "/normRVInterp.npy"
+		os.system('rm ' + checkDir)
+		checkDir = folders[folder] + fi + "/RVInterp.npy"
+		os.system('rm ' + checkDir)
+		checkDir = folders[folder] + fi + "/blazeRVInterp.npy"
+		os.system('rm ' + checkDir)
+	print('Files deleted for folder number ' + str(folder))
+print('Submitting jobs for normalization...')
+for j in range(nprocsmax): #submit parallel jobs
+	jobName = "spec" + str(j).zfill(4)
+	qsub = "qsub -N " + jobName + " flattenHARPSorders.qs"
+	os.system(qsub)
+	time.sleep(2)
+print('Jobs submitted. Waiting for them to finish.')
+for folder in range(n): #wait for the jobs to finish
+	filelist = array(os.listdir(folders[folder]))
+	fitslist = filelist[where(array([('20' in filelist[i][:2]) for i in range(len(filelist))]))[0]]
+	for fi in fitslist:
+		checkDir = folders[folder] + fi + "/wave.npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+		checkDir = folders[folder] + fi + "/norm.npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+		checkDir = folders[folder] + fi + "/normInterp.npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+		checkDir = folders[folder] + fi + "/normRVInterp.npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+		checkDir = folders[folder] + fi + "/RVInterp.npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+		checkDir = folders[folder] + fi + "/blazeRVInterp.npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+	print('Jobs completed for folder number ' + str(folder))
+print 'Done.'
+
+
+
+
+#file name change key: unshifted_waves -> waves // unshifted_order -> norm // order -> normRVInterp // fluxes -> RVInterp OR blazeRVInterp
+norder=72
+nprocsmax=norder
+print('Deleting old files...')
+for folder in range(n): #delete old files
+	for i in range(norder):
+		checkDir = folders[folder] + "waves" + str(i) + ".npy"
+		os.system('rm ' + checkDir)
+		checkDir = folders[folder] + "norm" + str(i) + ".npy"
+		os.system('rm ' + checkDir)
+		checkDir = folders[folder] + "normRVInterp" + str(i) + ".npy"
+		os.system('rm ' + checkDir)
+		checkDir = folders[folder] + "RVInterp" + str(i) + ".npy"
+		os.system('rm ' + checkDir)
+		checkDir = folders[folder] + "blazeRVInterp" + str(i) + ".npy"
+		os.system('rm ' + checkDir)
+	checkDir = folders[folder] + "allspTOTALFLUX.txt"
+	os.system('rm ' + checkDir)
+	print('Files deleted for folder number ' + str(folder))
+print 'Submitting jobs for stacking orders...'
+for j in range(nprocsmax): #submit parallel jobs
+	jobName = "ordr" + str(j).zfill(4)
+	qsub = "qsub -N " + jobName + " flattenHARPSorders.qs"
+	os.system(qsub)
+print 'Jobs submitted. Waiting for them to finish.'
+for folder in range(n): #wait for the jobs to finish
+	for i in range(norder):
+		checkDir = folders[folder] + "waves" + str(i) + ".npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+		checkDir = folders[folder] + "norm" + str(i) + ".npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+		checkDir = folders[folder] + "normRVInterp" + str(i) + ".npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+		checkDir = folders[folder] + "RVInterp" + str(i) + ".npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+		checkDir = folders[folder] + "blazeRVInterp" + str(i) + ".npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+	checkDir = folders[folder] + "allspTOTALFLUX.txt"
+	while not os.path.isfile(checkDir):
+		time.sleep(1)
+	checkDir = folders[folder] + "allspORDERFLUXBLAZE.npy"
+	while not os.path.isfile(checkDir):
+		time.sleep(1)
+	print('Jobs completed for folder number ' + str(folder))
+print 'Done.'
+
+#compress order-by-order fits into a more readable format
+qsub = "qsub combine_order_fits.qs"
+os.system(qsub)
+
+
+"""
+nprocsmax=800
+print 'Submitting jobs for doppler shifting...'
+for j in range(nprocsmax): #submit parallel jobs
+	jobName = "dopp" + str(j).zfill(4)
+	qsub = "qsub -N " + jobName + " flattenHARPSorders.qs"
+	os.system(qsub)
+	time.sleep(2)
+print 'Jobs submitted. Waiting for them to finish.'
+for folder in range(n): #wait for the jobs to finish
+	filelist = array(os.listdir(folders[folder]))
+	fitslist = filelist[where(array([('20' in filelist[i][:2]) for i in range(len(filelist))]))[0]]
+	for fi in fitslist:
+		checkDir = folders[folder] + fi + "/normRV.npy"
+		while not os.path.isfile(checkDir):
+			time.sleep(1)
+	print 'Jobs completed for folder number ' + str(folder)
+print 'Done.'
+"""
+
