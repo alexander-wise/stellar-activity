@@ -8,8 +8,8 @@ from astropy.io import fits
 from datetime import datetime
 from jdcal import gcal2jd
 
-#mode = 'parallel'
-mode = 'home'
+mode = 'parallel'
+#mode = 'home'
 
 #read in the input parameters
 job_type = sys.argv[1] if mode=='parallel' else 'norm' #spec:normalization or ordr:stacking for parallel jobs
@@ -17,15 +17,16 @@ proc_local = int(sys.argv[2]) if mode=='parallel' else 0 #local process index
 nprocsmax=72 if job_type=='ordr' else 1 if job_type=='norm' else 800
 
 
-datadir = "/lustre/work/phys/aww/spectra/AlphaCen/"  if mode=='parallel' else "/Volumes/My_Passport/HARPS/AlphaCen/"
+#datadir = "/lustre/work/phys/aww/spectra/AlphaCen/"  if mode=='parallel' else "/Volumes/My_Passport/HARPS/AlphaCen/"
 #datadir = "/lustre/work/phys/aww/spectra/HARPS/"  if mode=='parallel' else "/Volumes/My_Passport/HARPS/"
-targets = ['A']
+datadir = "/gpfs/group/ebf11/default/"
+targets = ["HARPS-N_solar"]
+#targets = ['A']
 #targets = ['EpsEri']
 
 
 #datadir = "/Users/aww/Desktop/"
 #targets = ['tau_ceti_spectra', 'fiber_calibration_spectra']
-
 
 
 print 'nprocsmax=' + str(nprocsmax)
@@ -34,7 +35,7 @@ print 'Beginning run number ' + str(proc_local)
 
 def xn(x0,p0):
 	return poly1d(p0)(x0)
-
+"""
 def getFolderSize(folder):
     total_size = os.path.getsize(folder)
     for item in os.listdir(folder):
@@ -77,37 +78,35 @@ def getFitsData(folder):
 		BORVs[j] = fits.open(folders[folder]+fitslist[j] + '/ccf.fits')[0].header['HIERARCH ESO DRS CCF RVC']
 	savetxt(folders[folder] + 'allspNLs.txt', column_stack((JDs,NLs)))
 	savetxt(folders[folder] + 'allspBRVs.txt', column_stack((JDs,BERVs,BORVs)))
-
+"""
 #normalize the spectra and make pictures or normalized data files
 def normalizeSpectra(folder):
-	os.system("rm " + folders[folder] + ".DS_Store")
+	#os.system("rm " + folders[folder] + ".DS_Store")
 	filelist = array(os.listdir(folders[folder]))
 	fitslist = filelist[where(array([('20' in filelist[i][:2]) for i in range(len(filelist))]))[0]]
 	fitslist = sort(fitslist)
-#	fitslist = delete(fitslist, badspec[folder]) if pics0files1 else fitslist
+	#fitslist = delete(fitslist, badspec[folder]) if pics0files1 else fitslist
 	ns = len(fitslist)
-	norder = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[0]
-	if int(ceil(foldersizes[folder] / maxgb)) > norder:
-		print "Warning: times series of 1 order may be too large (this warning only valid before ANY reduced spectra files have been added to data directory)"
-	nx = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[-1]
+	norder = fits.open(folders[folder]+fitslist[0]+'/s2d.fits')['SCIDATA'].data.shape[0]
+	#if int(ceil(foldersizes[folder] / maxgb)) > norder:
+	#	print "Warning: times series of 1 order may be too large (this warning only valid before ANY reduced spectra files have been added to data directory)"
+	nx = fits.open(folders[folder]+fitslist[0]+'/s2d.fits')['SCIDATA'].data.shape[-1]
 	#get observation days
-	JDs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,0]
+	JDs = genfromtxt(folders[folder] + 'allspNLs.txt')[:,0]
 	#get radial velocities
-	BERVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,1]
-	BORVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,2]
+	#BERVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,1]
+	#BORVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,2]
 	#use the wavelength scale of the last spectrum as my RV-interpolation domain
-	wfile0 = fits.open(folders[folder]+fitslist[-1]+'/e2ds.fits')[0].header['HIERARCH ESO DRS CAL TH FILE'][:30] + 'wave_A.fits'
-	ws0 = fits.open(folders[folder]+'waves/'+wfile0)[0].data
+	ws0 = fits.open(folders[folder]+fitslist[-1]+'/s2d.fits')['WAVEDATA_AIR_BARY'].data
+	#ws0 = fits.open(folders[folder]+'waves/'+wfile0)[0].data
 	#find the normalization functions
 	#blaze = fits.open(datadir + "HARPS.2009-06-01T20_00_04.000_blaze_A.fits")[0].data
 	nbox = 100
 	nperbox=nx/nbox+1
 	p = 2
 	tolerance=zeros(norder) + 0.005 #use these values for initializing tolerance determination
-	tolerance[:28] += array([ 0.035,  0.155,  0.315,  0.315,  0.315,  0.035,  0.075,  0.315,
-        0.315,  0.035,  0.155,  0.015,  0.035,  0.005,  0.035,  0.035,
-        0.035,  0.015,  0.005,  0.   ,  0.015,  0.   ,  0.035,  0.015,
-        0.   ,  0.   ,  0.   ,  0.005])
+	tolerance[:14] += array([ 0.035,  0.0,  0.075,  0.035,  0.015,  0.0,  0.005,  0.0,
+        0.0,  0.005,  0.0,  0.0,  0.0,  0.005])
 	maskmax = nbox - 8
 	CRmax = 2
 	#single process initialization
@@ -118,28 +117,29 @@ def normalizeSpectra(folder):
 	for j in range(nprocsmax):
 		proc_i[j] = sum(processlengths[:j])
 	#loop for this process
-	for ii in range(proc_i[proc_local],proc_i[proc_local] + processlengths[proc_local]):
+	for ii in tqdm(range(proc_i[proc_local],proc_i[proc_local] + processlengths[proc_local])):
 		print 'Beginning normalization for spectrum number ' + str(ii)
 		fitFailed = zeros(norder)
 		ps = zeros((norder,p+1))
 		xs = zeros((norder,nbox))
 		ys = zeros((norder,nbox))
-		fits0 = fits.open(folders[folder]+fitslist[ii]+'/e2ds.fits')[0]
-		wfile = fits0.header['HIERARCH ESO DRS CAL TH FILE'][:30] + 'wave_A.fits'
-		print 'wfile=' + wfile
-		ws = fits.open(folders[folder]+'waves/'+wfile)[0].data
-		bfile = fits0.header['HIERARCH ESO DRS BLAZE FILE'] #[:30] + 'blaze_A.fits'
-		print 'bfile=' + bfile
-		blaze = fits.open(folders[folder]+'blazes/'+bfile)[0].data
-		spectra0 = fits0.data / blaze #spectra to be normalized
-		fits0 = fits.open(folders[folder]+fitslist[ii]+'/e2ds.fits')[0] #reset this because otherwise modifying spectra1 will modify spectra0
-		spectra1 = fits0.data #spectra saved for later RV shifting - unnormalized spectra
+		fits0 = fits.open(folders[folder]+fitslist[ii]+'/s2d.fits')
+		#wfile = fits0.header['HIERARCH ESO DRS CAL TH FILE'][:30] + 'wave_A.fits'
+		#print 'wfile=' + wfile
+		ws = fits0['WAVEDATA_AIR_BARY'].data
+		#bfile = fits0.header['HIERARCH ESO DRS BLAZE FILE'] #[:30] + 'blaze_A.fits'
+		#print 'bfile=' + bfile
+		#blaze = fits.open(folders[folder]+'blazes/'+bfile)[0].data
+		spectra0 = fits0['SCIDATA'].data # / blaze #spectra to be normalized
+		#fits0 = fits.open(folders[folder]+fitslist[ii]+'/e2ds.fits')[0] #reset this because otherwise modifying spectra1 will modify spectra0
+		spectra1 = fits0['SCIDATA'].data #spectra saved for later RV shifting - unnormalized spectra
 		spectra1[where(spectra1<0)]=0.0
+		spectraErr = fits0['ERRDATA'].data
 		for j in range(norder):
 			if len(where(isnan(spectra0[j]))[0]) > 0.5:
 				fitFailed[j] = 1.0
 			else:
-				spectraWeights = sqrt(spectra1[j]) / sum(sqrt(spectra1[j])) #sqrt because numpy.polyfit says weights should be 1/sigma
+				spectraWeights = spectraErr[j] #sqrt(spectra1[j]) / sum(sqrt(spectra1[j])) #sqrt because numpy.polyfit says weights should be 1/sigma
 				lineFitWeights = zeros(nbox)
 				for k in range(nbox):
 					l = k*nperbox + argmax(spectra0[j][k*nperbox:(k+1)*nperbox])
@@ -201,61 +201,65 @@ def normalizeSpectra(folder):
 				if len(mask) > 0:
 					maskis[(folder,ii,j)] = mask
 				#repeat the fitting process with the following statement for 1 spectrum until tolerance no longer changes, then use those order-by-order tolerances for all spectra
-	#			if len(mask) > nbox/1.25:
-	#				tolerance[j] *= 2.0
-#	if not pics0files1:
+				#if len(mask) > nbox/1.25:
+				#	print("increasing tolerance...")
+				#	tolerance[j] *= 2.0
+		"""
+	#if not pics0files1:
 		#save the fits as plots
-#		matplotlib.interactive(False)
+	#	matplotlib.interactive(False)
 		for j in range(norder):
 			savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "S.txt", column_stack((ws[j],spectra0[j]))) #S stands for spectrum
-#			clf() #
-#			j+=1 #
-#			plot(ws[j],spectra0[j]) #
+	#		clf() #
+	#		j+=1 #
+	#		plot(ws[j],spectra0[j]) #
 			if (folder,ii,j) in maskis:
 				xs0 = delete(xs[j],maskis[(folder,ii,j)])
 				ys0 = delete(ys[j],maskis[(folder,ii,j)])
 			else:
 				xs0 = xs[j]
 				ys0 = ys[j]
-#			plot(xs0,ys0, 'k.', ms=10) #
-#			plot(xs[j],xn(xs[j],ps[j])) #
-#			print(j) #
+	#		plot(xs0,ys0, 'k.', ms=10) #
+	#		plot(xs[j],xn(xs[j],ps[j])) #
+	#		print(j) #
 			savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "M.txt", column_stack((xs0,ys0))) #M stands for masked data used in linear fit
 			savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "F.txt", column_stack((xs[j],xn(xs[j],ps[j])))) #F stands for fitting function
-#		matplotlib.interactive(True)
-#	else:
+	#	matplotlib.interactive(True)
+	#else:
+		"""
 		#normalize the spectra where the fit succeeded (all fit function values are > 0)
 		for j in range(norder):
 			if len(where(xn(ws[j],ps[j])<=0)[0]) == 0:
 				spectra0[j] = spectra0[j]/xn(ws[j],ps[j])
 			else:
 				fitFailed[j]=1.0
-		#save the normalized spectra to files
-		#########################################
-		# This may use too much file storage space for large data sets - it could be reduced to only output files containing fit parameters, and the interpolating / RV shifting could be done later
-		# To maximize computational speed, the current implementation assumes unlimited file storage space
-		#########################################
-		spectra2 = zeros(spectra0.shape)
-		for j in range(norder):
-			spectra2[j] = interp(ws0[j],ws[j],spectra0[j])
-		save(folders[folder]+fitslist[ii]+'/normInterp.npy', spectra2)
-		save(folders[folder]+fitslist[ii]+'/wave.npy', ws)
-		save(folders[folder]+fitslist[ii]+'/norm.npy', spectra0)
-		if sum(fitFailed) > 0.5:
-			savetxt(folders[folder]+fitslist[ii]+'/failedFits.txt', where(fitFailed>0.5)[0], fmt='%i')
-		spectra3 = zeros(spectra0.shape)
-		spectra4 = zeros(spectra0.shape)
-		#RV correct the spectra and interpolate all of them onto a single wavelength domain
-		for j in range(norder):
-			spectra0[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra0[j])
-			spectra3[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra1[j])
-			spectra4[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra1[j] / blaze[j])
-		#save the RV corrected and interpolated spectra to files
-		save(folders[folder]+fitslist[ii]+'/normRVInterp.npy', spectra0) #normalized, RV shifted, and interpolated
-		save(folders[folder]+fitslist[ii]+'/RVInterp.npy', spectra3) #RV shifted and interpolated
-		save(folders[folder]+fitslist[ii]+'/blazeRVInterp.npy', spectra4) #RV shifted, interpolated, and blaze shifted
-		if ii==0:
-			save(folders[folder]+'wave0.npy', ws0)
+		
+			#save the normalized spectra to files
+			#########################################
+			# This may use too much file storage space for large data sets - it could be reduced to only output files containing fit parameters, and the interpolating / RV shifting could be done later
+			# To maximize computational speed, the current implementation assumes unlimited file storage space
+			#########################################
+			spectra2 = zeros(spectra0.shape)
+			for j in range(norder):
+				spectra2[j] = interp(ws0[j],ws[j],spectra0[j])
+			save(folders[folder]+fitslist[ii]+'/normInterp.npy', spectra2)
+			save(folders[folder]+fitslist[ii]+'/wave.npy', ws)
+			save(folders[folder]+fitslist[ii]+'/norm.npy', spectra0)
+			if sum(fitFailed) > 0.5:
+				savetxt(folders[folder]+fitslist[ii]+'/failedFits.txt', where(fitFailed>0.5)[0], fmt='%i')
+			#spectra3 = zeros(spectra0.shape)
+			#spectra4 = zeros(spectra0.shape)
+			#RV correct the spectra and interpolate all of them onto a single wavelength domain
+			#for j in range(norder):
+			#	spectra0[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra0[j])
+				#spectra3[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra1[j])
+				#spectra4[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra1[j] / blaze[j])
+			#save the RV corrected and interpolated spectra to files
+			#save(folders[folder]+fitslist[ii]+'/normRVInterp.npy', spectra0) #normalized, RV shifted, and interpolated
+			#save(folders[folder]+fitslist[ii]+'/RVInterp.npy', spectra3) #RV shifted and interpolated
+			#save(folders[folder]+fitslist[ii]+'/blazeRVInterp.npy', spectra4) #RV shifted, interpolated, and blaze shifted
+			if ii==0:
+				save(folders[folder]+'wave0.npy', ws0)
 
 
 
@@ -289,7 +293,7 @@ matplotlib.interactive(True)
 #percentile(ms,10)
 """
 
-
+"""
 #redo the doppler shifts for normalized spectra, using norm.npy files to create normRV.npy files
 #This function uses old file names from a previous version, it has not been updated so it probably won't work
 def dopplerShiftSpectra(folder):
@@ -392,13 +396,13 @@ def timeSeriesPerOrder(folder):
 			save(folders[folder] + 'allspORDERFLUXBLAZE.npy', totalorderfluxes)
 
 
-
+"""
 
 #the following assumes the data for the target corresponding to datadir has been acquired and sorted using getHARPSdata.py 
 
-imagedir = '/lustre/scratch/aww/outputs/fitted_orders0/' if mode=='parallel' else "/Volumes/My_Passport/HARPS/AlphaCen/A/fitted_orders0/"
+#imagedir = '/lustre/scratch/aww/outputs/fitted_orders0/' if mode=='parallel' else "/Volumes/My_Passport/HARPS/AlphaCen/A/fitted_orders0/"
+#imagedir = "/gpfs/group/ebf11/default/afw5465/solar_plots/"
 
-os.system("rm " + datadir + ".DS_Store")
 
 folders = []
 for i in targets:
@@ -406,17 +410,17 @@ for i in targets:
 
 n = len(folders)
 
-
+"""
 #sort folders by size
 foldersizes = zeros(n)
 for i in range(n):
 	foldersizes[i] = getFolderSize(folders[i])
 folders = list(array(folders)[argsort(foldersizes)])
 foldersizes = sort(foldersizes)
-
+"""
 
 #initialize some parameters
-maxgb = 2000000000
+#maxgb = 2000000000
 
 datefmt='%Y-%m-%dT%H:%M:%S.%f'
 
@@ -431,11 +435,13 @@ badspec = array([[]]*n)
 #	for folder in range(n):
 #		getFitsData(folder)
 
-if job_type=='spec':
-	#make the normalized spectra files
-	for folder in range(n):
-		normalizeSpectra(folder)
+#if job_type=='spec':
 
+#make the normalized spectra files
+for folder in range(n):
+	normalizeSpectra(folder)
+	
+"""
 if job_type=='ordr':
 	#make the time-series per order files
 	for folder in range(n):
@@ -445,3 +451,4 @@ if job_type=='dopp':
 	#make the normRV.npy files from norm.npy files
 	for folder in range(n):
 		dopplerShiftSpectra(folder)
+"""

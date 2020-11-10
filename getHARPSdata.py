@@ -9,33 +9,35 @@ from scipy.stats.stats import linregress
 from os import listdir
 from scipy.stats import pearsonr
 from scipy.stats import kendalltau
-from ephem import *
 from astroML.time_series import lomb_scargle, lomb_scargle_BIC, lomb_scargle_bootstrap
 from astropy.io import fits
 from datetime import datetime
 from jdcal import gcal2jd
 import tarfile
+from tqdm import tdqm
 
 
 #First download the .fits and .tar files from the ESO archive to 'datadir' using the bash script provided (remove txt files from it using e.g. sed -i.bak '/txt/d' downloadRequest*.sh)
 
 #Then run the following section to acquire and sort HARPS data for a single target
 
-datadir = "/Volumes/My_Passport/HARPS/eEri/"
-os.system("rm " + datadir + ".DS_Store")
+datadir = "/gpfs/group/ebf11/default/HARPS-N_solar/"
 
 filelist = array(os.listdir(datadir))
-fitslist = filelist[where(array([('fits' in filelist[i][-4:]) for i in range(len(filelist))]))[0]]
+fitslist = filelist[where(array([('_S2D_A.fits' in filelist[i][-11:]) for i in range(len(filelist))]))[0]]
 
 
 #make folders with observation dates and move spectra files there
 for fi in fitslist:
 	obs = fits.open(datadir + fi)[0].header['DATE-OBS']
 	os.system("mkdir " + datadir + obs)
-	os.system("mv " + datadir + fi + " " + datadir + obs + "/fullsp.fits")
+	os.system("mv " + datadir + fi + " " + datadir + obs + "/s2d.fits")
+	os.system("mv " + datadir + fi[:-11]+"_S1D_A.fits" + " " + datadir + obs + "/s1d.fits")
+	os.system("mv " + datadir + fi[:-11]+"_CCF_A.fits" + " " + datadir + obs + "/ccf.fits")
 
 
 
+"""
 #extract tar files into the correct folders
 
 filelist = array(os.listdir(datadir))
@@ -196,7 +198,7 @@ for i in range(len(tarlist2)):
 					print fname0
 					os.system('mv '+datadir+k+'s/'+fname+' '+datadir+k+'s/'+fname0)
 
-
+"""
 
 ### EXTRACT RVs and NOISE LEVELS FROM FITS FILES ###
 
@@ -211,17 +213,18 @@ def getFolderSize(folder):
     return total_size
 
 #produce helper files for normalizeSpectra() in flattenHARPSorders.py
-def getFitsData(folder):
-	os.system("rm " + folders[folder] + ".DS_Store")
-	filelist = array(os.listdir(folders[folder]))
+def getFitsData():
+	filelist = array(os.listdir(datadir))
 	fitslist = filelist[where(array([('20' in filelist[i][:2]) for i in range(len(filelist))]))[0]]
 	fitslist = sort(fitslist)
 #	fitslist = delete(fitslist, badspec[folder]) if pics0files1 else fitslist
 	ns = len(fitslist)
-	norder = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[0]
-	if int(ceil(foldersizes[folder] / maxgb)) > norder:
-		print "Warning: times series of 1 order may be too large for farber/mills default memory"
-	nx = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[-1]
+	#norder = fits.open(datadir+fitslist[0]+'/e2ds.fits')[0].data.shape[0]
+	norder = fits.open(datadir+fitslist[0]+'/s2d.fits')[1].data.shape[0]
+	#if int(ceil(foldersizes[folder] / maxgb)) > norder:
+	#	print "Warning: times series of 1 order may be too large for farber/mills default memory"
+	#nx = fits.open(datadir+fitslist[0]+'/e2ds.fits')[0].data.shape[-1]
+	nx = fits.open(datadir+fitslist[0]+'/s2d.fits')[1].data.shape[-1]
 	#get observation days
 	JDs = zeros(ns)
 	for j in range(ns):
@@ -230,22 +233,20 @@ def getFitsData(folder):
 		JDs[j] = sum(gcal2jd(date0.year,date0.month,date0.day)) + (date0.hour + (date0.minute + (date0.second + date0.microsecond/1e6) / 60.0) / 60.0) / 24.0
 	#get noise levels from (1 / signal to noise ratios)
 	NLs = zeros(ns)
-	BERVs = zeros(ns) #earth barycentric RVs
-	BORVs = zeros(ns) #object barycentric RVs
-	for j in range(ns):
-		if j/100 == j/100.:
-			print(j)
-		fitstemp = fits.open(folders[folder]+fitslist[j] + '/fullsp.fits')
-		SNR = fitstemp[0].header['SNR']
+	#BERVs = zeros(ns) #earth barycentric RVs
+	#BORVs = zeros(ns) #object barycentric RVs
+	for j in tqdm(range(ns)):
+		fitstemp = fits.open(datadir+fitslist[j] + '/s2d.fits')
+		SNR = fitstemp[0].header['TNG QC ORDER35 SNR']
 		if (SNR > 0):
 			NLs[j] = 1.0 / SNR
 		else:
 			NLs[j] = 1000.0
-		BERVs[j] = fitstemp[0].header['HIERARCH ESO DRS BERV']
-		BORVs[j] = fits.open(folders[folder]+fitslist[j] + '/ccf.fits')[0].header['HIERARCH ESO DRS CCF RVC']
-	savetxt(folders[folder] + 'allspNLs.txt', column_stack((JDs,NLs)))
-	savetxt(folders[folder] + 'allspBRVs.txt', column_stack((JDs,BERVs,BORVs)))
-
+	#	BERVs[j] = fitstemp[0].header['HIERARCH ESO DRS BERV']
+	#	BORVs[j] = fits.open(datadir+fitslist[j] + '/ccf.fits')[0].header['HIERARCH ESO DRS CCF RVC']
+	savetxt(datadir + 'allspNLs.txt', column_stack((JDs,NLs)))
+	#savetxt(datadir + 'allspBRVs.txt', column_stack((JDs,BERVs,BORVs)))
+"""
 datadir = "/Volumes/My_Passport/HARPS/"
 targets = ['eEri']
 #datadir = "/Users/aww/Desktop/"
@@ -264,12 +265,12 @@ for i in range(n):
 	foldersizes[i] = getFolderSize(folders[i])
 folders = list(array(folders)[argsort(foldersizes)])
 foldersizes = sort(foldersizes)
-
+"""
 #initialize some parameters
 maxgb = 2000000000
 datefmt='%Y-%m-%dT%H:%M:%S.%f'
 
-getFitsData(0)
+getFitsData()
 
 #If getFitsData() fails due to missing ccf.fits files, find out how many are missing:
 #os.system('ls -d ' + folders[0] + '20* | wc -l')
