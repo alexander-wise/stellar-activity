@@ -6,6 +6,7 @@ from scipy.stats.stats import linregress
 from astropy.io import fits
 from datetime import datetime
 from jdcal import gcal2jd
+from tqdm import tqdm
 
 print 'Initializing...'
 """
@@ -45,31 +46,34 @@ folders = list(array(folders)[argsort(foldersizes)])
 foldersizes = sort(foldersizes)
 """
 
-#file name change key: norm -> normInterp // wave0 -> wave // norm0 -> norm // normRV -> normRVInterp // onlyRV -> RVInterp OR blazeRVInterp
-print('Deleting old files...')
-for folder in range(n): #delete old files
-	filelist = array(os.listdir(folders[folder]))
-	fitslist = filelist[where(array([('20' in filelist[i][:2]) for i in range(len(filelist))]))[0]]
-	for fi in fitslist:
-		checkDir = folders[folder] + fi + "/wave.npy"
-		os.system('rm ' + checkDir)
-		checkDir = folders[folder] + fi + "/norm.npy"
-		os.system('rm ' + checkDir)
-		checkDir = folders[folder] + fi + "/normInterp.npy"
-		os.system('rm ' + checkDir)
-		#checkDir = folders[folder] + fi + "/normRVInterp.npy"
-		#os.system('rm ' + checkDir)
-		#checkDir = folders[folder] + fi + "/RVInterp.npy"
-		#os.system('rm ' + checkDir)
-		#checkDir = folders[folder] + fi + "/blazeRVInterp.npy"
-		#os.system('rm ' + checkDir)
-	print('Files deleted for folder number ' + str(folder))
+deleteOldFiles = False
+
+if deleteOldFiles:
+	#file name change key: norm -> normInterp // wave0 -> wave // norm0 -> norm // normRV -> normRVInterp // onlyRV -> RVInterp OR blazeRVInterp
+	print('Deleting old files...')
+	for folder in tqdm(range(n)): #delete old files
+		filelist = array(os.listdir(folders[folder]))
+		fitslist = filelist[where(array([('20' in filelist[i][:2]) for i in range(len(filelist))]))[0]]
+		for fi in fitslist:
+			checkDir = folders[folder] + fi + "/wave.npy"
+			os.system('rm ' + checkDir)
+			checkDir = folders[folder] + fi + "/norm.npy"
+			os.system('rm ' + checkDir)
+			checkDir = folders[folder] + fi + "/normInterp.npy"
+			os.system('rm ' + checkDir)
+			#checkDir = folders[folder] + fi + "/normRVInterp.npy"
+			#os.system('rm ' + checkDir)
+			#checkDir = folders[folder] + fi + "/RVInterp.npy"
+			#os.system('rm ' + checkDir)
+			#checkDir = folders[folder] + fi + "/blazeRVInterp.npy"
+			#os.system('rm ' + checkDir)
+		print('Files deleted for folder number ' + str(folder))
 print('Submitting jobs for normalization...')
-for j in range(nprocsmax): #submit parallel jobs
+for j in tqdm(range(nprocsmax)): #submit parallel jobs
 	jobName = "spec" + str(j).zfill(4)
 	qsub = "qsub -N " + jobName + " flattenHARPSorders.pbs"
 	os.system(qsub)
-	time.sleep(2)
+	time.sleep(0.5)
 print('Jobs submitted. Waiting for them to finish.')
 for folder in range(n): #wait for the jobs to finish
 	filelist = array(os.listdir(folders[folder]))

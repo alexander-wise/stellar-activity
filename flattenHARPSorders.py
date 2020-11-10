@@ -7,6 +7,7 @@ from scipy.stats.stats import linregress
 from astropy.io import fits
 from datetime import datetime
 from jdcal import gcal2jd
+from tqdm import tqdm
 
 mode = 'parallel'
 #mode = 'home'
