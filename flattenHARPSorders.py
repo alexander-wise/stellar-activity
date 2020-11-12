@@ -1,9 +1,11 @@
 #find spot sensitive lines
 
+import numpy as np
 from numpy import *
 import os
 import sys
 from scipy.stats.stats import linregress
+import scipy.interpolate as interpolate
 from astropy.io import fits
 from datetime import datetime
 from jdcal import gcal2jd
@@ -127,15 +129,15 @@ def normalizeSpectra(folder):
 		fits0 = fits.open(folders[folder]+fitslist[ii]+'/s2d.fits')
 		#wfile = fits0.header['HIERARCH ESO DRS CAL TH FILE'][:30] + 'wave_A.fits'
 		#print 'wfile=' + wfile
-		ws = fits0['WAVEDATA_AIR_BARY'].data
+		ws = array(fits0['WAVEDATA_AIR_BARY'].data, dtype=float64)
 		#bfile = fits0.header['HIERARCH ESO DRS BLAZE FILE'] #[:30] + 'blaze_A.fits'
 		#print 'bfile=' + bfile
 		#blaze = fits.open(folders[folder]+'blazes/'+bfile)[0].data
-		spectra0 = fits0['SCIDATA'].data # / blaze #spectra to be normalized
+		spectra0 = array(fits0['SCIDATA'].data, dtype=float64) # / blaze #spectra to be normalized
 		#fits0 = fits.open(folders[folder]+fitslist[ii]+'/e2ds.fits')[0] #reset this because otherwise modifying spectra1 will modify spectra0
-		spectra1 = fits0['SCIDATA'].data #spectra saved for later RV shifting - unnormalized spectra
+		spectra1 = array(fits0['SCIDATA'].data, dtype=float64) #spectra saved for later RV shifting - unnormalized spectra
 		spectra1[where(spectra1<0)]=0.0
-		spectraErr = fits0['ERRDATA'].data
+		spectraErr = array(fits0['ERRDATA'].data, dtype=float64)
 		for j in range(norder):
 			if len(where(isnan(spectra0[j]))[0]) > 0.5:
 				fitFailed[j] = 1.0
@@ -156,7 +158,7 @@ def normalizeSpectra(folder):
 				ps[j] = polyfit(x1,y1,p,w=w1)
 				ssxm, ssxym, ssyxm, ssym =  cov(y1,xn(x1,ps[j]),aweights=w1).flat
 				r0 = ssxym / sqrt(ssxm*ssym) #weighted linear regression r-value
-	#			r0 = linregress(y1,xn(x1,ps[j]))[2] #unweighted linear regression r-value
+				#r0 = linregress(y1,xn(x1,ps[j]))[2] #unweighted linear regression r-value
 				CRs = 0
 				L=0
 				for k in range(nbox/2):
@@ -183,7 +185,7 @@ def normalizeSpectra(folder):
 									p1[k] = polyfit(x1,y1,p,w=w1)
 									ssxm, ssxym, ssyxm, ssym =  cov(y1,xn(x1,p1[k]),aweights=w1).flat
 									r1[k] = ssxym / sqrt(ssxm*ssym) #weighted linear regression r-value
-		#							r1[k] = linregress(y1,xn(x1,p1[k]))[2] #unweighted linear regression r-value
+									#r1[k] = linregress(y1,xn(x1,p1[k]))[2] #unweighted linear regression r-value
 					if foundK:
 						l = argmin(abs(r1-1))
 						if ys[j,l] > xn(xs[j,l],ps[j]):
@@ -206,27 +208,27 @@ def normalizeSpectra(folder):
 				#	print("increasing tolerance...")
 				#	tolerance[j] *= 2.0
 		"""
-	#if not pics0files1:
-		#save the fits as plots
-	#	matplotlib.interactive(False)
-		for j in range(norder):
-			savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "S.txt", column_stack((ws[j],spectra0[j]))) #S stands for spectrum
-	#		clf() #
-	#		j+=1 #
-	#		plot(ws[j],spectra0[j]) #
-			if (folder,ii,j) in maskis:
-				xs0 = delete(xs[j],maskis[(folder,ii,j)])
-				ys0 = delete(ys[j],maskis[(folder,ii,j)])
-			else:
-				xs0 = xs[j]
-				ys0 = ys[j]
-	#		plot(xs0,ys0, 'k.', ms=10) #
-	#		plot(xs[j],xn(xs[j],ps[j])) #
-	#		print(j) #
-			savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "M.txt", column_stack((xs0,ys0))) #M stands for masked data used in linear fit
-			savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "F.txt", column_stack((xs[j],xn(xs[j],ps[j])))) #F stands for fitting function
-	#	matplotlib.interactive(True)
-	#else:
+		#if not pics0files1:
+			#save the fits as plots
+		#	matplotlib.interactive(False)
+			for j in range(norder):
+				savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "S.txt", column_stack((ws[j],spectra0[j]))) #S stands for spectrum
+		#		clf() #
+		#		j+=1 #
+		#		plot(ws[j],spectra0[j]) #
+				if (folder,ii,j) in maskis:
+					xs0 = delete(xs[j],maskis[(folder,ii,j)])
+					ys0 = delete(ys[j],maskis[(folder,ii,j)])
+				else:
+					xs0 = xs[j]
+					ys0 = ys[j]
+		#		plot(xs0,ys0, 'k.', ms=10) #
+		#		plot(xs[j],xn(xs[j],ps[j])) #
+		#		print(j) #
+				savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "M.txt", column_stack((xs0,ys0))) #M stands for masked data used in linear fit
+				savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "F.txt", column_stack((xs[j],xn(xs[j],ps[j])))) #F stands for fitting function
+		#	matplotlib.interactive(True)
+		#else:
 		"""
 		#normalize the spectra where the fit succeeded (all fit function values are > 0)
 		for j in range(norder):
@@ -235,32 +237,203 @@ def normalizeSpectra(folder):
 			else:
 				fitFailed[j]=1.0
 		
-			#save the normalized spectra to files
-			#########################################
-			# This may use too much file storage space for large data sets - it could be reduced to only output files containing fit parameters, and the interpolating / RV shifting could be done later
-			# To maximize computational speed, the current implementation assumes unlimited file storage space
-			#########################################
-			spectra2 = zeros(spectra0.shape)
-			for j in range(norder):
-				spectra2[j] = interp(ws0[j],ws[j],spectra0[j])
-			save(folders[folder]+fitslist[ii]+'/normInterp.npy', spectra2)
-			save(folders[folder]+fitslist[ii]+'/wave.npy', ws)
-			save(folders[folder]+fitslist[ii]+'/norm.npy', spectra0)
-			if sum(fitFailed) > 0.5:
-				savetxt(folders[folder]+fitslist[ii]+'/failedFits.txt', where(fitFailed>0.5)[0], fmt='%i')
-			#spectra3 = zeros(spectra0.shape)
-			#spectra4 = zeros(spectra0.shape)
-			#RV correct the spectra and interpolate all of them onto a single wavelength domain
-			#for j in range(norder):
-			#	spectra0[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra0[j])
-				#spectra3[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra1[j])
-				#spectra4[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra1[j] / blaze[j])
-			#save the RV corrected and interpolated spectra to files
-			#save(folders[folder]+fitslist[ii]+'/normRVInterp.npy', spectra0) #normalized, RV shifted, and interpolated
-			#save(folders[folder]+fitslist[ii]+'/RVInterp.npy', spectra3) #RV shifted and interpolated
-			#save(folders[folder]+fitslist[ii]+'/blazeRVInterp.npy', spectra4) #RV shifted, interpolated, and blaze shifted
-			if ii==0:
-				save(folders[folder]+'wave0.npy', ws0)
+		#save the normalized spectra to files
+		#########################################
+		# This may use too much file storage space for large data sets - it could be reduced to only output files containing fit parameters, and the interpolating / RV shifting could be done later
+		# To maximize computational speed, the current implementation assumes unlimited file storage space
+		#########################################
+		spectra2 = zeros(spectra0.shape)
+		spectra3 = zeros(spectra0.shape)
+		spectra4 = zeros(spectra0.shape)
+		spectra5 = zeros(spectra0.shape)
+		spectra6 = zeros(spectra0.shape)
+		RVs_2 = zeros(len(JDs))
+		RVs_3 = 0.1*sin((JDs-2455000)*2.*pi/250.+1.7) #10 cm/s amplitude, 250-day period, 1.7 raidian phase shift
+		RVs_4 = 0.2*sin((JDs-2455000)*2.*pi/250.+1.7) #20 cm/s amplitude, 250-day period, 1.7 raidian phase shift
+		RVs_5 = 0.4*sin((JDs-2455000)*2.*pi/250.+1.7) #40 cm/s amplitude, 250-day period, 1.7 raidian phase shift
+		RVs_6 = 0.8*sin((JDs-2455000)*2.*pi/250.+1.7) #80 cm/s amplitude, 250-day period, 1.7 raidian phase shift
+		sinc_interp = BandLimitedInterpolator()
+		for j in range(norder):
+			#spectra2[j] = interp(ws0[j],ws[j],spectra0[j])
+			spectra2[j] = sinc_interp.interpolate(ws0[j],ws[j],spectra0[j])
+			spectra3[j] = sinc_interp.interpolate(ws0[j],ws[j]*(1.0+RVs_3[ii]/2.99792458e8),spectra0[j])
+			spectra4[j] = sinc_interp.interpolate(ws0[j],ws[j]*(1.0+RVs_4[ii]/2.99792458e8),spectra0[j])
+			spectra5[j] = sinc_interp.interpolate(ws0[j],ws[j]*(1.0+RVs_5[ii]/2.99792458e8),spectra0[j])
+			spectra6[j] = sinc_interp.interpolate(ws0[j],ws[j]*(1.0+RVs_6[ii]/2.99792458e8),spectra0[j])
+		ws_1D, sp3_1D = ordersTo1D(ws0,spectra3)
+		ws_1D, sp4_1D = ordersTo1D(ws0,spectra4)
+		ws_1D, sp5_1D = ordersTo1D(ws0,spectra5)
+		ws_1D, sp6_1D = ordersTo1D(ws0,spectra6)
+		ws_1D, sp2_1D = ordersTo1D(ws0,spectra2)
+		save(folders[folder]+"solar_only/norm"+str(ii)+".npy", array(sp2_1D, dtype=float32))
+		save(folders[folder]+"planet10cm/norm"+str(ii)+".npy", array(sp3_1D, dtype=float32))
+		save(folders[folder]+"planet20cm/norm"+str(ii)+".npy", array(sp4_1D, dtype=float32))
+		save(folders[folder]+"planet40cm/norm"+str(ii)+".npy", array(sp5_1D, dtype=float32))
+		save(folders[folder]+"planet80cm/norm"+str(ii)+".npy", array(sp6_1D, dtype=float32))
+		
+		#if os.path.isfile(folders[folder]+"master_spectrum.npy"):
+		#	master3 = zeros(sp2_1D.shape)
+
+		save(folders[folder]+fitslist[ii]+'/normInterp.npy', spectra2)
+		save(folders[folder]+fitslist[ii]+'/wave.npy', ws)
+		save(folders[folder]+fitslist[ii]+'/norm.npy', spectra0)
+		if sum(fitFailed) > 0.5:
+			savetxt(folders[folder]+fitslist[ii]+'/failedFits.txt', where(fitFailed>0.5)[0], fmt='%i')
+		#spectra3 = zeros(spectra0.shape)
+		#spectra4 = zeros(spectra0.shape)
+		#RV correct the spectra and interpolate all of them onto a single wavelength domain
+		#for j in range(norder):
+		#	spectra0[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra0[j])
+			#spectra3[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra1[j])
+			#spectra4[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra1[j] / blaze[j])
+		#save the RV corrected and interpolated spectra to files
+		#save(folders[folder]+fitslist[ii]+'/normRVInterp.npy', spectra0) #normalized, RV shifted, and interpolated
+		#save(folders[folder]+fitslist[ii]+'/RVInterp.npy', spectra3) #RV shifted and interpolated
+		#save(folders[folder]+fitslist[ii]+'/blazeRVInterp.npy', spectra4) #RV shifted, interpolated, and blaze shifted
+		if ii==0:
+			save(folders[folder]+'wave0.npy', ws0)
+			save(folders[folder]+'solar_only/interp_wavelengths.npy', ws_1D)
+			save(folders[folder]+'planet10cm/interp_wavelengths.npy', ws_1D)
+			save(folders[folder]+'planet20cm/interp_wavelengths.npy', ws_1D)
+			save(folders[folder]+'planet40cm/interp_wavelengths.npy', ws_1D)
+			save(folders[folder]+'planet80cm/interp_wavelengths.npy', ws_1D)
+			save(folders[folder]+'solar_only/RVs.npy', RVs_2)
+			save(folders[folder]+'planet10cm/RVs.npy', RVs_3)
+			save(folders[folder]+'planet20cm/RVs.npy', RVs_4)
+			save(folders[folder]+'planet40cm/RVs.npy', RVs_5)
+			save(folders[folder]+'planet80cm/RVs.npy', RVs_6)
+
+
+
+
+#function by Joe Ninan:
+def remove_nans(Y,X=None,method='drop'):
+    """ Returns a clean Y data after removing nans in it.
+    If X is provided, the corresponding values form X are also matched and (Y,X) is returned.
+    Input:
+         Y: numpy array
+         X: (optional) 1d numpy array of same size as Y
+         method: drop: drops the nan values and return a shorter array
+                 any scipy.interpolate.interp1d kind keywords: interpolates the nan values using interp1d 
+    Returns:
+         if X is provided:  (Y,X,NanMask)
+         else: (Y,NanMask)
+    """
+    NanMask = np.isnan(Y)
+    if method == 'drop':
+        returnY = Y[~NanMask]
+        if X is not None:
+            returnX = X[~NanMask]
+    else: # Do interp1d interpolation
+        if X is not None:
+            returnX = X
+        else:
+            returnX = np.arange(len(Y))
+        returnY = interpolate.interp1d(returnX[~NanMask],Y[~NanMask],kind=method,fill_value='extrapolate')(returnX)
+
+    if X is not None:
+        return returnY,returnX,NanMask
+    else:
+        return returnY,NanMask
+
+#function by Joe Ninan:
+class BandLimitedInterpolator(object):
+    """ Interpolator for doing Band-limited interpolation using windowed Sinc function """
+    def __init__(self,filter_size = 23, kaiserB=13):
+        """ 
+        Input:
+             filter_size : total number of pixels in the interpolation window 
+                           (keep it odd number), default =23
+             kaiserB     : beta value for determiniong the width of Kaiser window function
+        """
+        self.filter_size = filter_size
+        self.kaiserB = kaiserB
+        self.Filter = self.create_filter_curve(no_of_points = self.filter_size*21)
+        self.pixarray = np.arange(-int(self.filter_size/2), int(self.filter_size/2)+1,dtype=np.int)
+
+    def create_filter_curve(self,no_of_points=None):
+        """ Returns a cubit interpolator for windowed sinc Filter curve.
+        no_of_points: number of intepolation points to use in cubic inteprolator"""
+        if no_of_points is None:
+            no_of_points = self.filter_size*21
+        x = np.linspace(-int(self.filter_size/2), int(self.filter_size/2), no_of_points)
+        Sinc = np.sinc(x)
+        Window = np.kaiser(len(x),self.kaiserB)
+        FilterResponse = Window*Sinc
+        # append 0 to both ends far at the next node for preventing cubic spline 
+        # from extrapolating spurious values
+        return interpolate.CubicSpline( np.concatenate(([x[0]-1],x,[x[-1]+1])), 
+                                   np.concatenate(([0],FilterResponse,[0])))
+
+    def interpolate(self,newX,oldX,oldY,PeriodicBoundary=False):
+        """ Inteprolates oldY values at oldX coordinates to the newX coordinates.
+        Periodic boundary conditions set to True can create worse instbailities at edge..
+        oldX and oldY should be larger than filter window size self.filter_size"""
+        # First clean and remove any nans in the data
+        oldY, oldX, NanMask = remove_nans(oldY,X=oldX,method='linear')
+        if np.sum(NanMask) > 0:
+            logging.warning('Interpolated {0} NaNs'.format(np.sum(NanMask)))
+        oXsize = len(oldX)
+        # First generate a 2D array of difference in pixel values
+        OldXminusNewX = np.array(oldX)[:,np.newaxis] - np.array(newX)
+        # Find the minimum position to find nearest pixel for each each newX
+        minargs = np.argmin(np.abs(OldXminusNewX), axis=0)
+        # Pickout the those minumum values from 2D array
+        minvalues = OldXminusNewX[minargs, range(OldXminusNewX.shape[1])]
+        sign = minvalues < 0  # True means new X is infront of nearest old X
+        # coordinate of the next adjacent bracketing point
+        Nminargs = minargs +sign -~sign
+        Nminargs = Nminargs % oXsize  # Periodic boundary
+        # In terms of pixel coordinates the shift values will be
+        shiftvalues = minvalues/np.abs(oldX[minargs]-oldX[Nminargs])
+        # Coordinates to calculate the Filter values
+        FilterCoords = shiftvalues[:,np.newaxis] + self.pixarray
+        FilterValues = self.Filter(FilterCoords)
+        # Coordinates to pick the values to be multiplied with Filter and summed
+        OldYCoords = minargs[:,np.newaxis] + self.pixarray
+        if PeriodicBoundary:
+            OldYCoords = OldYCoords % oXsize  # Periodic boundary
+        else:   # Extrapolate the last value till end..
+            OldYCoords[OldYCoords >= oXsize] = oXsize-1
+            OldYCoords[OldYCoords < 0] = 0
+
+        OldYSlices = oldY[OldYCoords] # old flux values to be multipled with filter values
+        return np.sum(OldYSlices*FilterValues,axis=1)
+
+
+
+
+
+
+#collapse order-by-order spectra onto 1-D, cutting off overlapping order edges at the central wavelength of the overlapping region
+def ordersTo1D(ws0, sp0):
+	norder, nx = ws0.shape
+	ws = zeros(norder*nx)
+	sp = zeros(norder*nx)
+	ws[:nx] = ws0[0]
+	sp[:nx] = sp0[0]
+	for i in range(norder-1):
+		if ws0[i,-1] >  ws0[i+1,0]:
+			midw = (ws0[i,-1] + ws0[i+1,0]) / 2.0
+			midwi = where(ws > midw)[0][0]
+			midwi2 = where(ws0[i+1] > midw)[0][0]
+			ws[midwi:midwi+nx-midwi2] = ws0[i+1][midwi2:]
+			sp[midwi:midwi+nx-midwi2] = sp0[i+1][midwi2:]
+		elif ws0[i,-1] ==  ws0[i+1,0]:
+			midwi = argmax(ws)
+			ws[midwi:midwi+nx] = ws0[i+1]
+			sp[midwi:midwi+nx] = sp0[i+1]
+		else:
+			midwi = argmax(ws)+1
+			ws[midwi:midwi+nx] = ws0[i+1]
+			sp[midwi:midwi+nx] = sp0[i+1]
+	ws = ws[where(ws != 0)]
+	sp = sp[where(ws != 0)]
+	return ws, sp
+
+
+
+
 
 
 
@@ -440,6 +613,7 @@ badspec = array([[]]*n)
 
 #make the normalized spectra files
 for folder in range(n):
+	JDs = genfromtxt(folders[folder]+'allspNLs.txt')[:,0]
 	normalizeSpectra(folder)
 	
 """

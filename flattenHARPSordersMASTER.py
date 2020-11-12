@@ -8,6 +8,8 @@ from datetime import datetime
 from jdcal import gcal2jd
 from tqdm import tqdm
 
+deleteOldFiles = False
+
 print 'Initializing...'
 """
 def getFolderSize(folder):
@@ -46,15 +48,13 @@ folders = list(array(folders)[argsort(foldersizes)])
 foldersizes = sort(foldersizes)
 """
 
-deleteOldFiles = False
-
 if deleteOldFiles:
 	#file name change key: norm -> normInterp // wave0 -> wave // norm0 -> norm // normRV -> normRVInterp // onlyRV -> RVInterp OR blazeRVInterp
 	print('Deleting old files...')
-	for folder in tqdm(range(n)): #delete old files
+	for folder in range(n): #delete old files
 		filelist = array(os.listdir(folders[folder]))
 		fitslist = filelist[where(array([('20' in filelist[i][:2]) for i in range(len(filelist))]))[0]]
-		for fi in fitslist:
+		for fi in tqdm(fitslist):
 			checkDir = folders[folder] + fi + "/wave.npy"
 			os.system('rm ' + checkDir)
 			checkDir = folders[folder] + fi + "/norm.npy"
