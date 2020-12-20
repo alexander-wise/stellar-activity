@@ -233,7 +233,7 @@ def normalizeSpectra(folder):
 		spectra7 = zeros(spectra0.shape)
 		sinc_interp = BandLimitedInterpolator()
 		order_centers = (ws[:,0]+ws[:,-1]) / 2.0
-		solar_order_centers = (solar_waves[:,0]+solar_waves[:,-1]) / 2.0
+		solar_order_centers = (waves_solar[:,0]+waves_solar[:,-1]) / 2.0
 		if dataset=="HARPS-N_solar":
 			RV_offset = 0.0
 		if dataset=="AlphaCenB":
