@@ -8,45 +8,27 @@ from datetime import datetime
 from jdcal import gcal2jd
 from tqdm import tqdm
 
-deleteOldFiles = False
+deleteOldFiles = True
+
+dataset = sys.argv[1]
 
 print 'Initializing...'
-"""
-def getFolderSize(folder):
-    total_size = os.path.getsize(folder)
-    for item in os.listdir(folder):
-        itempath = os.path.join(folder, item)
-        if os.path.isfile(itempath):
-            total_size += os.path.getsize(itempath)
-        elif os.path.isdir(itempath):
-            total_size += getFolderSize(itempath)
-    return total_size
-"""
+
 nprocsmax=800
 
-#datadir = "/Volumes/My_Passport/HARPS/AlphaCen/"
-#datadir = "/lustre/work/phys/aww/spectra/AlphaCen/"
-#datadir = "/lustre/work/phys/aww/spectra/HARPS/"
-#targets = ['B']
-#targets = ['EpsEri']
-#os.system("rm " + datadir + ".DS_Store")
+if dataset=="HARPS-N_solar":
+	datadir = "/gpfs/group/ebf11/default/"
+	targets = ["HARPS-N_solar"]
 
-datadir = "/gpfs/group/ebf11/default/"
-targets = ["HARPS-N_solar"]
+if dataset=="AlphaCenB":
+	datadir = "/storage/work/afw5465/AlphaCen/"
+	targets = ["B"]
 
 folders = []
 for i in targets:
 	folders.append(datadir + i + '/')
 
 n = len(folders)
-"""
-#sort folders by size
-foldersizes = zeros(n)
-for i in range(n):
-	foldersizes[i] = getFolderSize(folders[i])
-folders = list(array(folders)[argsort(foldersizes)])
-foldersizes = sort(foldersizes)
-"""
 
 if deleteOldFiles:
 	#file name change key: norm -> normInterp // wave0 -> wave // norm0 -> norm // normRV -> normRVInterp // onlyRV -> RVInterp OR blazeRVInterp
@@ -61,16 +43,10 @@ if deleteOldFiles:
 			os.system('rm ' + checkDir)
 			checkDir = folders[folder] + fi + "/normInterp.npy"
 			os.system('rm ' + checkDir)
-			#checkDir = folders[folder] + fi + "/normRVInterp.npy"
-			#os.system('rm ' + checkDir)
-			#checkDir = folders[folder] + fi + "/RVInterp.npy"
-			#os.system('rm ' + checkDir)
-			#checkDir = folders[folder] + fi + "/blazeRVInterp.npy"
-			#os.system('rm ' + checkDir)
 		print('Files deleted for folder number ' + str(folder))
 print('Submitting jobs for normalization...')
 for j in tqdm(range(nprocsmax)): #submit parallel jobs
-	jobName = "spec" + str(j).zfill(4)
+	jobName = "spec" + str(j).zfill(4) + dataset
 	qsub = "qsub -N " + jobName + " flattenHARPSorders.pbs"
 	os.system(qsub)
 	time.sleep(0.5)
@@ -85,18 +61,9 @@ for folder in range(n): #wait for the jobs to finish
 		checkDir = folders[folder] + fi + "/norm.npy"
 		while not os.path.isfile(checkDir):
 			time.sleep(1)
-		checkDir = folders[folder] + fi + "/normInterp.npy"
+		checkDir = folders[folder] + fi + "/normRVInterp.npy"
 		while not os.path.isfile(checkDir):
 			time.sleep(1)
-		#checkDir = folders[folder] + fi + "/normRVInterp.npy"
-		#while not os.path.isfile(checkDir):
-		#	time.sleep(1)
-		#checkDir = folders[folder] + fi + "/RVInterp.npy"
-		#while not os.path.isfile(checkDir):
-		#	time.sleep(1)
-		#checkDir = folders[folder] + fi + "/blazeRVInterp.npy"
-		#while not os.path.isfile(checkDir):
-		#	time.sleep(1)
 	print('Jobs completed for folder number ' + str(folder))
 print 'Done.'
 

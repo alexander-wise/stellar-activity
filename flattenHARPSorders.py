@@ -56,50 +56,6 @@ def getWaves(folder, wfile=''):
 	return new_waves
 
 
-"""
-def getFolderSize(folder):
-    total_size = os.path.getsize(folder)
-    for item in os.listdir(folder):
-        itempath = os.path.join(folder, item)
-        if os.path.isfile(itempath):
-            total_size += os.path.getsize(itempath)
-        elif os.path.isdir(itempath):
-            total_size += getFolderSize(itempath)
-    return total_size
-
-#quick function - can be run locally on laptop to produce helper files for normalizeSpectra()
-def getFitsData(folder):
-	os.system("rm " + folders[folder] + ".DS_Store")
-	filelist = array(os.listdir(folders[folder]))
-	fitslist = filelist[where(array([('20' in filelist[i][:2]) for i in range(len(filelist))]))[0]]
-	fitslist = sort(fitslist)
-#	fitslist = delete(fitslist, badspec[folder]) if pics0files1 else fitslist
-	ns = len(fitslist)
-	norder = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[0]
-	if int(ceil(foldersizes[folder] / maxgb)) > norder:
-		print "Warning: times series of 1 order may be too large"
-	nx = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[-1]
-	#get observation days
-	JDs = zeros(ns)
-	for j in range(ns):
-		date0 = datetime.strptime(fitslist[j],datefmt)
-		JDs[j] = sum(gcal2jd(date0.year,date0.month,date0.day)) + (date0.hour + (date0.minute + date0.microsecond/1e6/60.0) / 60.0) / 24.0
-	#get noise levels from (1 / signal to noise ratios)
-	NLs = zeros(ns)
-	BERVs = zeros(ns) #earth barycentric RVs
-	BORVs = zeros(ns) #object barycentric RVs
-	for j in range(ns):
-		fitstemp = fits.open(folders[folder]+fitslist[j] + '/fullsp.fits')
-		SNR = fitstemp[0].header['SNR']
-		if (SNR > 0):
-			NLs[j] = 1.0 / SNR
-		else:
-			NLs[j] = 1000.0
-		BERVs[j] = fitstemp[0].header['HIERARCH ESO DRS BERV']
-		BORVs[j] = fits.open(folders[folder]+fitslist[j] + '/ccf.fits')[0].header['HIERARCH ESO DRS CCF RVC']
-	savetxt(folders[folder] + 'allspNLs.txt', column_stack((JDs,NLs)))
-	savetxt(folders[folder] + 'allspBRVs.txt', column_stack((JDs,BERVs,BORVs)))
-"""
 #normalize the spectra and make pictures or normalized data files
 def normalizeSpectra(folder):
 	#os.system("rm " + folders[folder] + ".DS_Store")
@@ -612,15 +568,6 @@ for i in targets:
 
 n = len(folders)
 
-"""
-#sort folders by size
-foldersizes = zeros(n)
-for i in range(n):
-	foldersizes[i] = getFolderSize(folders[i])
-folders = list(array(folders)[argsort(foldersizes)])
-foldersizes = sort(foldersizes)
-"""
-
 #initialize some parameters
 #maxgb = 2000000000
 
@@ -641,7 +588,6 @@ badspec = array([[]]*n)
 
 #make the normalized spectra files
 for folder in range(n):
-	JDs = genfromtxt(folders[folder]+'allspNLs.txt')[:,0]
 	normalizeSpectra(folder)
 	
 """
