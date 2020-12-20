@@ -22,7 +22,7 @@ if dataset=="HARPS-N_solar":
 	datasetCode="HNS"
 
 if dataset=="AlphaCenB":
-	datadir = "/storage/work/afw5465/AlphaCen/"
+	datadir = "/gpfs/group/ebf11/default/afw5465/AlphaCen/"
 	targets = ["B"]
 	datasetCode="ACB"
 
