@@ -12,7 +12,7 @@ deleteOldFiles = True
 
 dataset = sys.argv[1]
 
-print 'Initializing...'
+print('Initializing...')
 
 nprocsmax=800
 
