@@ -80,7 +80,7 @@ def normalizeSpectra(folder):
 		goodspec[badspec]=0
 		JDis = load(folders[folder]+"JDis.npy")
 		useSpec = where(goodspec)[0][JDis]
-		binaryRV = load("binaryRV.npy")
+		binaryRV = load(folders[folder]+"binaryRV.npy")
 	waves_solar = load(folders[folder]+"waves_solar.npy")
 	#ws0 = fits.open(folders[folder]+fitslist[-1]+'/s2d.fits')['WAVEDATA_AIR_BARY'].data
 	nbox = 100
