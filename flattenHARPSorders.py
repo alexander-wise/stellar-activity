@@ -30,7 +30,7 @@ if dataset=="HARPS-N_solar":
 	targets = ["HARPS-N_solar"]
 
 if dataset=="AlphaCenB":
-	datadir = "/storage/work/afw5465/AlphaCen"
+	datadir = "/storage/work/afw5465/AlphaCen/"
 	targets = ["B"]
 
 
