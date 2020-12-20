@@ -29,7 +29,7 @@ if dataset=="HARPS-N_solar":
 	datadir = "/gpfs/group/ebf11/default/"
 	targets = ["HARPS-N_solar"]
 
-if star=="AlphaCenB":
+if dataset=="AlphaCenB":
 	datadir = "/storage/work/afw5465/AlphaCen"
 	targets = ["B"]
 
