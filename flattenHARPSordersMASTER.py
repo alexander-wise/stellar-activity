@@ -41,7 +41,7 @@ if deleteOldFiles:
 			os.system('rm ' + checkDir)
 			checkDir = folders[folder] + fi + "/norm.npy"
 			os.system('rm ' + checkDir)
-			checkDir = folders[folder] + fi + "/normInterp.npy"
+			checkDir = folders[folder] + fi + "/normRVInterp.npy"
 			os.system('rm ' + checkDir)
 		print('Files deleted for folder number ' + str(folder))
 print('Submitting jobs for normalization...')
