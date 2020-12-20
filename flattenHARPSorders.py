@@ -1,4 +1,4 @@
-#find spot sensitive lines
+#normalize spectra
 
 import numpy as np
 from numpy import *
@@ -11,6 +11,9 @@ from datetime import datetime
 from jdcal import gcal2jd
 from tqdm import tqdm
 
+dataset="HARPS-N_solar"
+dataset="AlphaCenB"
+
 mode = 'parallel'
 #mode = 'home'
 
@@ -18,14 +21,17 @@ mode = 'parallel'
 job_type = sys.argv[1] if mode=='parallel' else 'norm' #spec:normalization or ordr:stacking for parallel jobs
 proc_local = int(sys.argv[2]) if mode=='parallel' else 0 #local process index
 nprocsmax=72 if job_type=='ordr' else 1 if job_type=='norm' else 800
-
+dataset = sys.argv[3] if mode=='parallel' else 'AlphaCenB'
 
 #datadir = "/lustre/work/phys/aww/spectra/AlphaCen/"  if mode=='parallel' else "/Volumes/My_Passport/HARPS/AlphaCen/"
 #datadir = "/lustre/work/phys/aww/spectra/HARPS/"  if mode=='parallel' else "/Volumes/My_Passport/HARPS/"
-datadir = "/gpfs/group/ebf11/default/"
-targets = ["HARPS-N_solar"]
-#targets = ['A']
-#targets = ['EpsEri']
+if dataset=="HARPS-N_solar":
+	datadir = "/gpfs/group/ebf11/default/"
+	targets = ["HARPS-N_solar"]
+
+if star=="AlphaCenB":
+	datadir = "/storage/work/afw5465/AlphaCen"
+	targets = ["B"]
 
 
 #datadir = "/Users/aww/Desktop/"
@@ -38,6 +44,18 @@ print 'Beginning run number ' + str(proc_local)
 
 def xn(x0,p0):
 	return poly1d(p0)(x0)
+
+
+def getWaves(folder, wfile=''):
+	waves = array(fits.open(folders[folder]+'waves/'+wfile)[0].data,dtype=np.float64)
+	norder, nx = waves.shape
+	new_waves = zeros(waves.shape)
+	for i in arange(norder):
+		waves_fit = polyfit(arange(nx),waves[i],2)
+		new_waves[i] = polyval(waves_fit,arange(nx))
+	return new_waves
+
+
 """
 def getFolderSize(folder):
     total_size = os.path.getsize(folder)
@@ -90,26 +108,37 @@ def normalizeSpectra(folder):
 	fitslist = sort(fitslist)
 	#fitslist = delete(fitslist, badspec[folder]) if pics0files1 else fitslist
 	ns = len(fitslist)
-	norder = fits.open(folders[folder]+fitslist[0]+'/s2d.fits')['SCIDATA'].data.shape[0]
-	#if int(ceil(foldersizes[folder] / maxgb)) > norder:
-	#	print "Warning: times series of 1 order may be too large (this warning only valid before ANY reduced spectra files have been added to data directory)"
-	nx = fits.open(folders[folder]+fitslist[0]+'/s2d.fits')['SCIDATA'].data.shape[-1]
-	#get observation days
-	JDs = genfromtxt(folders[folder] + 'allspNLs.txt')[:,0]
-	#get radial velocities
-	#BERVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,1]
-	#BORVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,2]
-	#use the wavelength scale of the last spectrum as my RV-interpolation domain
-	ws0 = fits.open(folders[folder]+fitslist[-1]+'/s2d.fits')['WAVEDATA_AIR_BARY'].data
-	#ws0 = fits.open(folders[folder]+'waves/'+wfile0)[0].data
-	#find the normalization functions
-	#blaze = fits.open(datadir + "HARPS.2009-06-01T20_00_04.000_blaze_A.fits")[0].data
+	if dataset=="HARPS-N_solar":
+		norder = fits.open(folders[folder]+fitslist[0]+'/s2d.fits')['SCIDATA'].data.shape[0]
+		nx = fits.open(folders[folder]+fitslist[0]+'/s2d.fits')['SCIDATA'].data.shape[-1]
+		JDs = genfromtxt(folders[folder] + 'allspNLs.txt')[:,0]
+		useSpec = arange(0,len(JDs))
+	if dataset=="AlphaCenB":
+		norder = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[0]
+		nx = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[-1]
+		JDs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,0]
+		BERVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,1]*1000.0
+		BORVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,2]*1000.0
+		badspec = load(folders[folder]+"badspec.npy")
+		goodspec = ones(len(JDs),dtype=bool)
+		goodspec[badspec]=0
+		JDis = load(folders[folder]+"JDis.npy")
+		useSpec = where(goodspec)[0][JDis]
+		binaryRV = load("binaryRV.npy")
+	waves_solar = load(folders[folder]+"waves_solar.npy")
+	#ws0 = fits.open(folders[folder]+fitslist[-1]+'/s2d.fits')['WAVEDATA_AIR_BARY'].data
 	nbox = 100
 	nperbox=nx/nbox+1
 	p = 2
 	tolerance=zeros(norder) + 0.005 #use these values for initializing tolerance determination
-	tolerance[:14] += array([ 0.035,  0.0,  0.075,  0.035,  0.015,  0.0,  0.005,  0.0,
+	if dataset=="HARPS-N_solar":
+		tolerance[:14] += array([ 0.035,  0.0,  0.075,  0.035,  0.015,  0.0,  0.005,  0.0,
         0.0,  0.005,  0.0,  0.0,  0.0,  0.005])
+	if dataset=="AlphaCenB":
+		tolerance[:28] += array([ 0.035,  0.155,  0.315,  0.315,  0.315,  0.035,  0.075,  0.315,
+        0.315,  0.035,  0.155,  0.015,  0.035,  0.005,  0.035,  0.035,
+        0.035,  0.015,  0.005,  0.   ,  0.015,  0.   ,  0.035,  0.015,
+        0.   ,  0.   ,  0.   ,  0.005])
 	maskmax = nbox - 8
 	CRmax = 2
 	#single process initialization
@@ -126,23 +155,31 @@ def normalizeSpectra(folder):
 		ps = zeros((norder,p+1))
 		xs = zeros((norder,nbox))
 		ys = zeros((norder,nbox))
-		fits0 = fits.open(folders[folder]+fitslist[ii]+'/s2d.fits')
-		#wfile = fits0.header['HIERARCH ESO DRS CAL TH FILE'][:30] + 'wave_A.fits'
-		#print 'wfile=' + wfile
-		ws = array(fits0['WAVEDATA_AIR_BARY'].data, dtype=float64)
-		#bfile = fits0.header['HIERARCH ESO DRS BLAZE FILE'] #[:30] + 'blaze_A.fits'
-		#print 'bfile=' + bfile
-		#blaze = fits.open(folders[folder]+'blazes/'+bfile)[0].data
-		spectra0 = array(fits0['SCIDATA'].data, dtype=float64) # / blaze #spectra to be normalized
-		#fits0 = fits.open(folders[folder]+fitslist[ii]+'/e2ds.fits')[0] #reset this because otherwise modifying spectra1 will modify spectra0
-		spectra1 = array(fits0['SCIDATA'].data, dtype=float64) #spectra saved for later RV shifting - unnormalized spectra
-		spectra1[where(spectra1<0)]=0.0
-		spectraErr = array(fits0['ERRDATA'].data, dtype=float64)
+		if dataset=="HARPS-N_solar":
+			fits0 = fits.open(folders[folder]+fitslist[ii]+'/s2d.fits')
+			ws = array(fits0['WAVEDATA_AIR_BARY'].data, dtype=float64)
+			spectra0 = array(fits0['SCIDATA'].data, dtype=float64) # / blaze #spectra to be normalized
+			spectra1 = array(fits0['SCIDATA'].data, dtype=float64) #spectra saved for later RV shifting - unnormalized spectra
+			spectra1[where(spectra1<0)]=0.0
+			spectraErr = array(fits0['ERRDATA'].data, dtype=float64)
+		if dataset=="AlphaCenB":
+			fits0 = fits.open(folders[folder]+fitslist[ii]+'/e2ds.fits')[0]
+			wfile = fits0.header['HIERARCH ESO DRS CAL TH FILE'][:30] + 'wave_A.fits'
+			ws = getWaves(folder,wfile)
+			bfile = fits0.header['HIERARCH ESO DRS BLAZE FILE'] #[:30] + 'blaze_A.fits'
+			blaze = array(fits.open(folders[folder]+'blazes/'+bfile)[0].data,dtype=np.float64)
+			spectra0 = array(fits0.data,dtype=np.float64) / blaze #spectra to be normalized
+			fits0 = fits.open(folders[folder]+fitslist[ii]+'/e2ds.fits')[0] #reset this because otherwise modifying spectra1 will modify spectra0
+			spectra1 = array(fits0.data,dtype=np.float64) #spectra saved for later RV shifting - unnormalized spectra
+			spectra1[where(spectra1<0)]=0.0
 		for j in range(norder):
 			if len(where(isnan(spectra0[j]))[0]) > 0.5:
 				fitFailed[j] = 1.0
 			else:
-				spectraWeights = spectraErr[j] #sqrt(spectra1[j]) / sum(sqrt(spectra1[j])) #sqrt because numpy.polyfit says weights should be 1/sigma
+				if dataset=="HARPS-N_solar":
+					spectraWeights = spectraErr[j]
+				if dataset=="AlphaCenB":
+					spectraWeights = sqrt(spectra1[j]) / sum(sqrt(spectra1[j])) #sqrt because numpy.polyfit says weights should be 1/sigma
 				lineFitWeights = zeros(nbox)
 				for k in range(nbox):
 					l = k*nperbox + argmax(spectra0[j][k*nperbox:(k+1)*nperbox])
@@ -207,29 +244,7 @@ def normalizeSpectra(folder):
 				#if len(mask) > nbox/1.25:
 				#	print("increasing tolerance...")
 				#	tolerance[j] *= 2.0
-		"""
-		#if not pics0files1:
-			#save the fits as plots
-		#	matplotlib.interactive(False)
-			for j in range(norder):
-				savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "S.txt", column_stack((ws[j],spectra0[j]))) #S stands for spectrum
-		#		clf() #
-		#		j+=1 #
-		#		plot(ws[j],spectra0[j]) #
-				if (folder,ii,j) in maskis:
-					xs0 = delete(xs[j],maskis[(folder,ii,j)])
-					ys0 = delete(ys[j],maskis[(folder,ii,j)])
-				else:
-					xs0 = xs[j]
-					ys0 = ys[j]
-		#		plot(xs0,ys0, 'k.', ms=10) #
-		#		plot(xs[j],xn(xs[j],ps[j])) #
-		#		print(j) #
-				savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "M.txt", column_stack((xs0,ys0))) #M stands for masked data used in linear fit
-				savetxt(imagedir + "n" + str(folder) + "o" + str(j) + "s" + str(ii) + "F.txt", column_stack((xs[j],xn(xs[j],ps[j])))) #F stands for fitting function
-		#	matplotlib.interactive(True)
-		#else:
-		"""
+		
 		#normalize the spectra where the fit succeeded (all fit function values are > 0)
 		for j in range(norder):
 			if len(where(xn(ws[j],ps[j])<=0)[0]) == 0:
@@ -247,61 +262,74 @@ def normalizeSpectra(folder):
 		spectra4 = zeros(spectra0.shape)
 		spectra5 = zeros(spectra0.shape)
 		spectra6 = zeros(spectra0.shape)
-		RVs_2 = zeros(len(JDs))
-		RVs_3 = 0.1*sin((JDs-2455000)*2.*pi/250.+1.7) #10 cm/s amplitude, 250-day period, 1.7 raidian phase shift
-		RVs_4 = 0.2*sin((JDs-2455000)*2.*pi/250.+1.7) #20 cm/s amplitude, 250-day period, 1.7 raidian phase shift
-		RVs_5 = 0.4*sin((JDs-2455000)*2.*pi/250.+1.7) #40 cm/s amplitude, 250-day period, 1.7 raidian phase shift
-		RVs_6 = 0.8*sin((JDs-2455000)*2.*pi/250.+1.7) #80 cm/s amplitude, 250-day period, 1.7 raidian phase shift
+		spectra7 = zeros(spectra0.shape)
 		sinc_interp = BandLimitedInterpolator()
+		order_centers = (ws[:,0]+ws[:,-1]) / 2.0
+		solar_order_centers = (solar_waves[:,0]+solar_waves[:,-1]) / 2.0
+		if dataset=="HARPS-N_solar":
+			RV_offset = 0.0
+		if dataset=="AlphaCenB":
+			RV_offset = BERVs[ii]-binaryRV[ii]-median(BORVs-binaryRV)
+		RVs_2 = zeros(len(JDs)) + RV_offset
+		RVs_3 = 0.1*sin((JDs-2455000)*2.*pi/250.+1.7) + RV_offset #10 cm/s amplitude, 250-day period, 1.7 raidian phase shift
+		RVs_4 = 0.2*sin((JDs-2455000)*2.*pi/250.+1.7) + RV_offset #20 cm/s amplitude, 250-day period, 1.7 raidian phase shift
+		RVs_5 = 0.4*sin((JDs-2455000)*2.*pi/250.+1.7) + RV_offset #40 cm/s amplitude, 250-day period, 1.7 raidian phase shift
+		RVs_6 = 0.8*sin((JDs-2455000)*2.*pi/250.+1.7) + RV_offset #80 cm/s amplitude, 250-day period, 1.7 raidian phase shift
+		RVs_7 = 0.3*sin((JDs-2455000)*2.*pi/37.+1.7) + 0.6*sin((JDs-2455000)*2.*pi/133.+2.7) + 0.5*sin((JDs-2455000)*2.*pi/365.+3.7) + 0.8*sin((JDs-2455000)*2.*pi/250.+4.7) + RV_offset
 		for j in range(norder):
 			#spectra2[j] = interp(ws0[j],ws[j],spectra0[j])
-			spectra2[j] = sinc_interp.interpolate(ws0[j],ws[j],spectra0[j])
-			spectra3[j] = sinc_interp.interpolate(ws0[j],ws[j]*(1.0+RVs_3[ii]/2.99792458e8),spectra0[j])
-			spectra4[j] = sinc_interp.interpolate(ws0[j],ws[j]*(1.0+RVs_4[ii]/2.99792458e8),spectra0[j])
-			spectra5[j] = sinc_interp.interpolate(ws0[j],ws[j]*(1.0+RVs_5[ii]/2.99792458e8),spectra0[j])
-			spectra6[j] = sinc_interp.interpolate(ws0[j],ws[j]*(1.0+RVs_6[ii]/2.99792458e8),spectra0[j])
-		ws_1D, sp3_1D = ordersTo1D(ws0,spectra3)
-		ws_1D, sp4_1D = ordersTo1D(ws0,spectra4)
-		ws_1D, sp5_1D = ordersTo1D(ws0,spectra5)
-		ws_1D, sp6_1D = ordersTo1D(ws0,spectra6)
-		ws_1D, sp2_1D = ordersTo1D(ws0,spectra2)
-		save(folders[folder]+"solar_only/norm"+str(ii)+".npy", array(sp2_1D, dtype=float32))
-		save(folders[folder]+"planet10cm/norm"+str(ii)+".npy", array(sp3_1D, dtype=float32))
-		save(folders[folder]+"planet20cm/norm"+str(ii)+".npy", array(sp4_1D, dtype=float32))
-		save(folders[folder]+"planet40cm/norm"+str(ii)+".npy", array(sp5_1D, dtype=float32))
-		save(folders[folder]+"planet80cm/norm"+str(ii)+".npy", array(sp6_1D, dtype=float32))
-		
-		#if os.path.isfile(folders[folder]+"master_spectrum.npy"):
-		#	master3 = zeros(sp2_1D.shape)
+			center_diff = amin(abs(order_centers[j]-solar_order_centers))
+			k = argmin(abs(order_centers[j]-solar_order_centers))
+			if center_diff<10.0:
+				spectra2[j] = sinc_interp.interpolate(waves_solar[k],ws[j]*(1.0+RVs_2[ii]/2.99792458e8),spectra0[j])
+				spectra3[j] = sinc_interp.interpolate(waves_solar[k],ws[j]*(1.0+RVs_3[ii]/2.99792458e8),spectra0[j])
+				spectra4[j] = sinc_interp.interpolate(waves_solar[k],ws[j]*(1.0+RVs_4[ii]/2.99792458e8),spectra0[j])
+				spectra5[j] = sinc_interp.interpolate(waves_solar[k],ws[j]*(1.0+RVs_5[ii]/2.99792458e8),spectra0[j])
+				spectra6[j] = sinc_interp.interpolate(waves_solar[k],ws[j]*(1.0+RVs_6[ii]/2.99792458e8),spectra0[j])
+				spectra7[j] = sinc_interp.interpolate(waves_solar[k],ws[j]*(1.0+RVs_7[ii]/2.99792458e8),spectra0[j])
+		ws_1D, sp2_1D = ordersTo1D(waves_solar,spectra2)
+		ws_1D, sp3_1D = ordersTo1D(waves_solar,spectra3)
+		ws_1D, sp4_1D = ordersTo1D(waves_solar,spectra4)
+		ws_1D, sp5_1D = ordersTo1D(waves_solar,spectra5)
+		ws_1D, sp6_1D = ordersTo1D(waves_solar,spectra6)
+		ws_1D, sp7_1D = ordersTo1D(waves_solar,spectra7)
 
-		save(folders[folder]+fitslist[ii]+'/normInterp.npy', spectra2)
+		save(folders[folder]+fitslist[ii]+'/normRVInterp.npy', spectra2)
 		save(folders[folder]+fitslist[ii]+'/wave.npy', ws)
 		save(folders[folder]+fitslist[ii]+'/norm.npy', spectra0)
 		if sum(fitFailed) > 0.5:
 			savetxt(folders[folder]+fitslist[ii]+'/failedFits.txt', where(fitFailed>0.5)[0], fmt='%i')
-		#spectra3 = zeros(spectra0.shape)
-		#spectra4 = zeros(spectra0.shape)
-		#RV correct the spectra and interpolate all of them onto a single wavelength domain
-		#for j in range(norder):
-		#	spectra0[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra0[j])
-			#spectra3[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra1[j])
-			#spectra4[j] = interp(ws0[j],ws[j]*(1.0+(BERVs[ii]-BORVs[ii])/2.99792458e5),spectra1[j] / blaze[j])
-		#save the RV corrected and interpolated spectra to files
-		#save(folders[folder]+fitslist[ii]+'/normRVInterp.npy', spectra0) #normalized, RV shifted, and interpolated
-		#save(folders[folder]+fitslist[ii]+'/RVInterp.npy', spectra3) #RV shifted and interpolated
-		#save(folders[folder]+fitslist[ii]+'/blazeRVInterp.npy', spectra4) #RV shifted, interpolated, and blaze shifted
+		
+		if ii in useSpec:
+			iii = argmin(abs(useSpec-ii))
+			save(folders[folder]+"stellar_only/norm"+str(iii)+".npy", array(sp2_1D, dtype=float32))
+			save(folders[folder]+"planet10cm/norm"+str(iii)+".npy", array(sp3_1D, dtype=float32))
+			save(folders[folder]+"planet20cm/norm"+str(iii)+".npy", array(sp4_1D, dtype=float32))
+			save(folders[folder]+"planet40cm/norm"+str(iii)+".npy", array(sp5_1D, dtype=float32))
+			save(folders[folder]+"planet80cm/norm"+str(iii)+".npy", array(sp6_1D, dtype=float32))
+			save(folders[folder]+"planet_multi/norm"+str(iii)+".npy", array(sp7_1D, dtype=float32))
+		
 		if ii==0:
-			save(folders[folder]+'wave0.npy', ws0)
-			save(folders[folder]+'solar_only/interp_wavelengths.npy', ws_1D)
+			save(folders[folder]+'stellar_only/interp_wavelengths.npy', ws_1D)
 			save(folders[folder]+'planet10cm/interp_wavelengths.npy', ws_1D)
 			save(folders[folder]+'planet20cm/interp_wavelengths.npy', ws_1D)
 			save(folders[folder]+'planet40cm/interp_wavelengths.npy', ws_1D)
 			save(folders[folder]+'planet80cm/interp_wavelengths.npy', ws_1D)
-			save(folders[folder]+'solar_only/RVs.npy', RVs_2)
-			save(folders[folder]+'planet10cm/RVs.npy', RVs_3)
-			save(folders[folder]+'planet20cm/RVs.npy', RVs_4)
-			save(folders[folder]+'planet40cm/RVs.npy', RVs_5)
-			save(folders[folder]+'planet80cm/RVs.npy', RVs_6)
+			save(folders[folder]+'planet_multi/interp_wavelengths.npy', ws_1D)
+			
+			save(folders[folder]+'stellar_only/RVs.npy', RVs_2[useSpec])
+			save(folders[folder]+'planet10cm/RVs.npy', RVs_3[useSpec])
+			save(folders[folder]+'planet20cm/RVs.npy', RVs_4[useSpec])
+			save(folders[folder]+'planet40cm/RVs.npy', RVs_5[useSpec])
+			save(folders[folder]+'planet80cm/RVs.npy', RVs_6[useSpec])
+			save(folders[folder]+'planet_multi/RVs.npy', RVs_7[useSpec])
+			
+			save(folders[folder]+'stellar_only/JDs.npy', JDs[useSpec])
+			save(folders[folder]+'planet10cm/JDs.npy', JDs[useSpec])
+			save(folders[folder]+'planet20cm/JDs.npy', JDs[useSpec])
+			save(folders[folder]+'planet40cm/JDs.npy', JDs[useSpec])
+			save(folders[folder]+'planet80cm/JDs.npy', JDs[useSpec])
+			save(folders[folder]+'planet_multi/JDs.npy', JDs[useSpec])
 
 
 
