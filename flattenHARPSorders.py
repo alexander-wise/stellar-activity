@@ -77,17 +77,22 @@ def normalizeSpectra(folder):
 		JDs = genfromtxt(folders[folder] + 'allspNLs.txt')[:,0]
 		useSpec = arange(0,len(JDs))
 	if dataset=="AlphaCenB":
-		norder = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[0]
-		nx = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[-1]
 		JDs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,0]
-		BERVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,1]*1000.0
-		BORVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,2]*1000.0
 		badspec = load(folders[folder]+"badspec.npy")
 		goodspec = ones(len(JDs),dtype=bool)
 		goodspec[badspec]=0
 		JDis = load(folders[folder]+"JDis.npy")
 		useSpec = where(goodspec)[0][JDis]
-		binaryRV = load(folders[folder]+"binaryRV.npy")
+		JDs = JDs[useSpec]
+		fitslist = fitslist[useSpec]
+		ns = len(fitslist)
+		norder = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[0]
+		nx = fits.open(folders[folder]+fitslist[0]+'/e2ds.fits')[0].data.shape[-1]
+		BERVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[useSpec,1]*1000.0
+		BORVs = genfromtxt(folders[folder] + 'allspBRVs.txt')[useSpec,2]*1000.0
+		binaryRV = load(folders[folder]+"binaryRV.npy")[useSpec]
+		useSpec = arange(0,len(JDs))
+
 	waves_solar = load(folders[folder]+"waves_solar.npy")
 	#ws0 = fits.open(folders[folder]+fitslist[-1]+'/s2d.fits')['WAVEDATA_AIR_BARY'].data
 	nbox = 100
