@@ -11,8 +11,8 @@ from datetime import datetime
 from jdcal import gcal2jd
 from tqdm import tqdm
 
-dataset="HARPS-N_solar"
-dataset="AlphaCenB"
+#dataset="HARPS-N_solar"
+#dataset="AlphaCenB"
 
 mode = 'parallel'
 #mode = 'home'
