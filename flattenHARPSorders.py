@@ -21,7 +21,14 @@ mode = 'parallel'
 job_type = sys.argv[1] if mode=='parallel' else 'norm' #spec:normalization or ordr:stacking for parallel jobs
 proc_local = int(sys.argv[2]) if mode=='parallel' else 0 #local process index
 nprocsmax=72 if job_type=='ordr' else 1 if job_type=='norm' else 800
-dataset = sys.argv[3] if mode=='parallel' else 'AlphaCenB'
+
+datasetCode = sys.argv[3] if mode=='parallel' else 'ACB'
+
+if datasetCode=="ACB":
+	dataset = "AlphaCenB"
+
+if datasetCode=="HNS":
+	dataset = "HARPS-N_solar"
 
 #datadir = "/lustre/work/phys/aww/spectra/AlphaCen/"  if mode=='parallel' else "/Volumes/My_Passport/HARPS/AlphaCen/"
 #datadir = "/lustre/work/phys/aww/spectra/HARPS/"  if mode=='parallel' else "/Volumes/My_Passport/HARPS/"

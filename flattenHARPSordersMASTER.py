@@ -19,10 +19,12 @@ nprocsmax=800
 if dataset=="HARPS-N_solar":
 	datadir = "/gpfs/group/ebf11/default/"
 	targets = ["HARPS-N_solar"]
+	datasetCode="HNS"
 
 if dataset=="AlphaCenB":
 	datadir = "/storage/work/afw5465/AlphaCen/"
 	targets = ["B"]
+	datasetCode="ACB"
 
 folders = []
 for i in targets:
@@ -46,7 +48,7 @@ if deleteOldFiles:
 		print('Files deleted for folder number ' + str(folder))
 print('Submitting jobs for normalization...')
 for j in tqdm(range(nprocsmax)): #submit parallel jobs
-	jobName = "spec" + str(j).zfill(4) + dataset
+	jobName = "spec" + str(j).zfill(4) + datasetCode
 	qsub = "qsub -N " + jobName + " flattenHARPSorders.pbs"
 	os.system(qsub)
 	time.sleep(0.5)
