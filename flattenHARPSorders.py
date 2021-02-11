@@ -10,6 +10,7 @@ from astropy.io import fits
 from datetime import datetime
 from jdcal import gcal2jd
 from tqdm import tqdm
+import pandas as pd
 
 #dataset="HARPS-N_solar"
 #dataset="AlphaCenB"
@@ -76,6 +77,7 @@ def normalizeSpectra(folder):
 		nx = fits.open(folders[folder]+fitslist[0]+'/s2d.fits')['SCIDATA'].data.shape[-1]
 		JDs = genfromtxt(folders[folder] + 'allspNLs.txt')[:,0]
 		useSpec = arange(0,len(JDs))
+		timeseries_data_file = pd.read_csv('harpn_sun_release_timeseries_2015-2018.csv')
 	if dataset=="AlphaCenB":
 		JDs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,0]
 		badspec = load(folders[folder]+"badspec.npy")
@@ -231,19 +233,23 @@ def normalizeSpectra(folder):
 		spectra5 = zeros(spectra0.shape)
 		spectra6 = zeros(spectra0.shape)
 		spectra7 = zeros(spectra0.shape)
+		spectra8 = zeros(spectra0.shape)
+		spectra9 = zeros(spectra0.shape)
 		sinc_interp = BandLimitedInterpolator()
 		order_centers = (ws[:,0]+ws[:,-1]) / 2.0
 		solar_order_centers = (waves_solar[:,0]+waves_solar[:,-1]) / 2.0
 		if dataset=="HARPS-N_solar":
-			RV_offset = 0.0
+			RV_offset = -1.0 * (timeseries_data_file["berv_bary_to_helio"] + timeseries_data_file["rv_diff_extinction"] + median(timeseries_data_file["rv"]))
 		if dataset=="AlphaCenB":
 			RV_offset = BERVs[ii]-binaryRV[ii]-median(BORVs-binaryRV)
 		RVs_2 = zeros(len(JDs)) + RV_offset
-		RVs_3 = 0.1*sin((JDs-2455000)*2.*pi/250.+1.7) + RV_offset #10 cm/s amplitude, 250-day period, 1.7 raidian phase shift
-		RVs_4 = 0.2*sin((JDs-2455000)*2.*pi/250.+1.7) + RV_offset #20 cm/s amplitude, 250-day period, 1.7 raidian phase shift
-		RVs_5 = 0.4*sin((JDs-2455000)*2.*pi/250.+1.7) + RV_offset #40 cm/s amplitude, 250-day period, 1.7 raidian phase shift
-		RVs_6 = 0.8*sin((JDs-2455000)*2.*pi/250.+1.7) + RV_offset #80 cm/s amplitude, 250-day period, 1.7 raidian phase shift
+		RVs_3 = 0.1*sin((JDs-2455000)*2.*pi/11.4+1.7) + RV_offset #10 cm/s amplitude, 11.4-day period, 1.7 raidian phase shift
+		RVs_4 = 0.2*sin((JDs-2455000)*2.*pi/11.4+1.7) + RV_offset #20 cm/s amplitude, 11.4-day period, 1.7 raidian phase shift
+		RVs_5 = 0.4*sin((JDs-2455000)*2.*pi/11.4+1.7) + RV_offset #40 cm/s amplitude, 11.4-day period, 1.7 raidian phase shift
+		RVs_6 = 0.8*sin((JDs-2455000)*2.*pi/11.4+1.7) + RV_offset #80 cm/s amplitude, 11.4-day period, 1.7 raidian phase shift
 		RVs_7 = 0.3*sin((JDs-2455000)*2.*pi/37.+1.7) + 0.6*sin((JDs-2455000)*2.*pi/133.+2.7) + 0.5*sin((JDs-2455000)*2.*pi/365.+3.7) + 0.8*sin((JDs-2455000)*2.*pi/250.+4.7) + RV_offset
+		RVs_8 = 0.3*sin((JDs-2455000)*2.*pi/3.7+1.7) + 0.6*sin((JDs-2455000)*2.*pi/13.3+2.7) + 0.5*sin((JDs-2455000)*2.*pi/36.5+3.7) + 0.8*sin((JDs-2455000)*2.*pi/25.0+4.7) + RV_offset
+		RVs_9 = 0.3*sin((JDs-2455000)*2.*pi/.37+1.7) + 0.6*sin((JDs-2455000)*2.*pi/1.33+2.7) + 0.5*sin((JDs-2455000)*2.*pi/3.65+3.7) + 0.8*sin((JDs-2455000)*2.*pi/2.5+4.7) + RV_offset
 		for j in range(norder):
 			#spectra2[j] = interp(ws0[j],ws[j],spectra0[j])
 			center_diff = amin(abs(order_centers[j]-solar_order_centers))
@@ -255,12 +261,16 @@ def normalizeSpectra(folder):
 				spectra5[j] = sinc_interp.interpolate(waves_solar[k],ws[j]*(1.0+RVs_5[ii]/2.99792458e8),spectra0[j])
 				spectra6[j] = sinc_interp.interpolate(waves_solar[k],ws[j]*(1.0+RVs_6[ii]/2.99792458e8),spectra0[j])
 				spectra7[j] = sinc_interp.interpolate(waves_solar[k],ws[j]*(1.0+RVs_7[ii]/2.99792458e8),spectra0[j])
+				spectra8[j] = sinc_interp.interpolate(waves_solar[k],ws[j]*(1.0+RVs_8[ii]/2.99792458e8),spectra0[j])
+				spectra9[j] = sinc_interp.interpolate(waves_solar[k],ws[j]*(1.0+RVs_9[ii]/2.99792458e8),spectra0[j])
 		ws_1D, sp2_1D = ordersTo1D(waves_solar,spectra2)
 		ws_1D, sp3_1D = ordersTo1D(waves_solar,spectra3)
 		ws_1D, sp4_1D = ordersTo1D(waves_solar,spectra4)
 		ws_1D, sp5_1D = ordersTo1D(waves_solar,spectra5)
 		ws_1D, sp6_1D = ordersTo1D(waves_solar,spectra6)
 		ws_1D, sp7_1D = ordersTo1D(waves_solar,spectra7)
+		ws_1D, sp8_1D = ordersTo1D(waves_solar,spectra8)
+		ws_1D, sp9_1D = ordersTo1D(waves_solar,spectra9)
 
 		save(folders[folder]+fitslist[ii]+'/normRVInterp.npy', spectra2)
 		save(folders[folder]+fitslist[ii]+'/wave.npy', ws)
@@ -276,6 +286,8 @@ def normalizeSpectra(folder):
 			save(folders[folder]+"planet40cm/norm"+str(iii)+".npy", array(sp5_1D, dtype=float32))
 			save(folders[folder]+"planet80cm/norm"+str(iii)+".npy", array(sp6_1D, dtype=float32))
 			save(folders[folder]+"planet_multi/norm"+str(iii)+".npy", array(sp7_1D, dtype=float32))
+			save(folders[folder]+"planet_multi_lowerperiod/norm"+str(iii)+".npy", array(sp8_1D, dtype=float32))
+			save(folders[folder]+"planet_multi_lowestperiod/norm"+str(iii)+".npy", array(sp9_1D, dtype=float32))
 		
 		if ii==0:
 			save(folders[folder]+'stellar_only/interp_wavelengths.npy', ws_1D)
@@ -284,6 +296,8 @@ def normalizeSpectra(folder):
 			save(folders[folder]+'planet40cm/interp_wavelengths.npy', ws_1D)
 			save(folders[folder]+'planet80cm/interp_wavelengths.npy', ws_1D)
 			save(folders[folder]+'planet_multi/interp_wavelengths.npy', ws_1D)
+			save(folders[folder]+'planet_multi_lowerperiod/interp_wavelengths.npy', ws_1D)
+			save(folders[folder]+'planet_multi_lowestperiod/interp_wavelengths.npy', ws_1D)
 			
 			save(folders[folder]+'stellar_only/RVs.npy', RVs_2[useSpec])
 			save(folders[folder]+'planet10cm/RVs.npy', RVs_3[useSpec])
@@ -291,6 +305,8 @@ def normalizeSpectra(folder):
 			save(folders[folder]+'planet40cm/RVs.npy', RVs_5[useSpec])
 			save(folders[folder]+'planet80cm/RVs.npy', RVs_6[useSpec])
 			save(folders[folder]+'planet_multi/RVs.npy', RVs_7[useSpec])
+			save(folders[folder]+'planet_multi_lowerperiod/RVs.npy', RVs_8[useSpec])
+			save(folders[folder]+'planet_multi_lowestperiod/RVs.npy', RVs_9[useSpec])
 			
 			save(folders[folder]+'stellar_only/JDs.npy', JDs[useSpec])
 			save(folders[folder]+'planet10cm/JDs.npy', JDs[useSpec])
@@ -298,6 +314,8 @@ def normalizeSpectra(folder):
 			save(folders[folder]+'planet40cm/JDs.npy', JDs[useSpec])
 			save(folders[folder]+'planet80cm/JDs.npy', JDs[useSpec])
 			save(folders[folder]+'planet_multi/JDs.npy', JDs[useSpec])
+			save(folders[folder]+'planet_multi_lowerperiod/JDs.npy', JDs[useSpec])
+			save(folders[folder]+'planet_multi_lowestperiod/JDs.npy', JDs[useSpec])
 
 
 
