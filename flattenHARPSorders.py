@@ -77,7 +77,7 @@ def normalizeSpectra(folder):
 		nx = fits.open(folders[folder]+fitslist[0]+'/s2d.fits')['SCIDATA'].data.shape[-1]
 		JDs = genfromtxt(folders[folder] + 'allspNLs.txt')[:,0]
 		useSpec = arange(0,len(JDs))
-		timeseries_data_file = pd.read_csv('harpn_sun_release_timeseries_2015-2018.csv')
+		timeseries_data_file = pd.read_csv(folders[folder]+'harpn_sun_release_timeseries_2015-2018.csv')
 	if dataset=="AlphaCenB":
 		JDs = genfromtxt(folders[folder] + 'allspBRVs.txt')[:,0]
 		badspec = load(folders[folder]+"badspec.npy")
